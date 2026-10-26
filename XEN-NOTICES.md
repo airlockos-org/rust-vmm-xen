@@ -2,6 +2,11 @@
 
 ## Mini-OS permission notice
 
+Copyright 2003 Rolf Neugebauer, Intel Research Cambridge;
+2002–2003 Keir Fraser, University of Cambridge;
+2005 Grzegorz Milos, Intel Research Cambridge;
+2006 Robert Kaiser, FH Wiesbaden.
+
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the
@@ -27,6 +32,8 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ## Mirage Xen ISC notice
+
+Copyright (c) 2020 Martin Lucina <martin@lucina.net>.
 
 Permission to use, copy, modify, and distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
