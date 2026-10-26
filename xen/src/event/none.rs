@@ -1,7 +1,7 @@
 use xen_sys::{
     bindings::{
-        EVTCHNOP_alloc_unbound, EVTCHNOP_bind_interdomain, EVTCHNOP_close, EVTCHNOP_send,
-        __HYPERVISOR_event_channel_op,
+        __HYPERVISOR_event_channel_op, EVTCHNOP_alloc_unbound, EVTCHNOP_bind_interdomain,
+        EVTCHNOP_close, EVTCHNOP_send,
     },
     error::XenError,
     DomId, XenConstBuffer, XenHypercall, XenMutBuffer,
@@ -36,8 +36,17 @@ struct EvtchnParam {
 impl<H: XenHypercall> RawEventChannelInterface<H> {
     pub fn bind_virq(&self, virq: u32, vcpu: u32) -> Result<EventChannel, XenError> {
         use xen_sys::bindings::{evtchn_bind_virq, EVTCHNOP_bind_virq};
-        let mut arg = evtchn_bind_virq { virq, vcpu, port: 0 };
-        unsafe { self.0.hypercall2(__HYPERVISOR_event_channel_op as _, [EVTCHNOP_bind_virq as _, (&raw mut arg).addr()])?; }
+        let mut arg = evtchn_bind_virq {
+            virq,
+            vcpu,
+            port: 0,
+        };
+        unsafe {
+            self.0.hypercall2(
+                __HYPERVISOR_event_channel_op as _,
+                [EVTCHNOP_bind_virq as _, (&raw mut arg).addr()],
+            )?;
+        }
         Ok(EventChannel(arg.port))
     }
     pub fn new(hyp: H) -> Self {

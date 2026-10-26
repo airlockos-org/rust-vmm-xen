@@ -25,7 +25,8 @@ pub trait XenHvmOp: XenHypercall {
         Ok(())
     }
 
-    /// Xen monotonic system time in nanoseconds, paired with shared-info wallclock.
+    /// Xen monotonic system time in nanoseconds, paired with shared-info
+    /// wallclock.
     fn get_time(&self) -> Result<u64, XenError> {
         let mut time = xen_hvm_get_time { now: 0 };
         let mut buffer = self.make_mut_object(&mut time)?;

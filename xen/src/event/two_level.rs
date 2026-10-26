@@ -1,9 +1,10 @@
 //! Xen two-level event bitmap, with atomic clear/mask and hypercall unmask.
 use core::{
     ptr::addr_of_mut,
-    sync::atomic::{AtomicU8, AtomicU64, Ordering},
+    sync::atomic::{AtomicU64, AtomicU8, Ordering},
 };
-use xen_sys::{XenHypercall, bindings::*, error::XenError};
+
+use xen_sys::{bindings::*, error::XenError, XenHypercall};
 
 pub struct TwoLevel {
     shared: *mut shared_info,
@@ -35,7 +36,8 @@ impl TwoLevel {
         }
     }
     /// One bounded snapshot. A racing notification re-arms pending_sel/upcall.
-    /// Each callback must drain queue state, not count notifications as messages.
+    /// Each callback must drain queue state, not count notifications as
+    /// messages.
     pub fn drain(&self, mut handler: impl FnMut(u32)) {
         unsafe {
             let v = addr_of_mut!((*self.shared).vcpu_info[0]);

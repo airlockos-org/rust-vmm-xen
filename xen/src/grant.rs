@@ -1,10 +1,12 @@
-//! Grant-table v1 for auto-translated (PVH/HVM) guests. Pages are never freed by
-//! this layer. Callers must pin/quarantine them while revoke or unmap is busy.
+//! Grant-table v1 for auto-translated (PVH/HVM) guests. Pages are never freed
+//! by this layer. Callers must pin/quarantine them while revoke or unmap is
+//! busy.
 use core::{
     ptr::{addr_of_mut, write_volatile},
     sync::atomic::{AtomicU16, Ordering},
 };
-use xen_sys::{DomId, XenHypercall, bindings::*, error::XenError};
+
+use xen_sys::{bindings::*, error::XenError, DomId, XenHypercall};
 
 pub struct GrantTable {
     entries: *mut grant_entry_v1,
@@ -12,7 +14,8 @@ pub struct GrantTable {
 impl GrantTable {
     /// # Safety
     /// Dedicated, pinned, page-aligned guest physical/identity-mapped page.
-    /// The page is replaced by Xen's grant-table frame and is never an allocator page.
+    /// The page is replaced by Xen's grant-table frame and is never an
+    /// allocator page.
     pub unsafe fn initialize<H: XenHypercall>(hyp: &H, page: *mut u8) -> Result<Self, XenError> {
         let mut version = gnttab_set_version { version: 1 };
         unsafe {
@@ -40,7 +43,8 @@ impl GrantTable {
     }
     /// # Safety
     /// gref is uniquely owned by caller, backing page pinned, GPA valid; only
-    /// the specified authorized peer may receive the reference. v1 uses 32-bit PFNs.
+    /// the specified authorized peer may receive the reference. v1 uses 32-bit
+    /// PFNs.
     pub unsafe fn grant(&self, gref: u32, peer: DomId, pfn: u64) -> Result<(), XenError> {
         if !(8..512).contains(&gref) || pfn > u64::from(u32::MAX) {
             return Err(XenError::Other("grant bounds"));
@@ -84,7 +88,8 @@ impl ForeignMapping {
     /// # Safety
     /// Reserved guest physical page, identity mapped and exclusively owned.
     /// No references into it until this succeeds, nor after unmap. The grant
-    /// descriptor must come from the authorized channel-establishment authority.
+    /// descriptor must come from the authorized channel-establishment
+    /// authority.
     pub unsafe fn map<H: XenHypercall>(
         hyp: &H,
         peer: DomId,

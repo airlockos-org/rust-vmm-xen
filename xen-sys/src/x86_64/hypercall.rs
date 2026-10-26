@@ -2,7 +2,7 @@
 //!
 //! See [X86XenHypercall].
 
-use core::arch::x86_64::{CpuidResult, __cpuid};
+use core::arch::x86_64::{__cpuid, CpuidResult};
 
 use crate::{
     error::{parse_hypercall_return, XenError},

@@ -1,8 +1,10 @@
-//! Xen versioned PV clock. Based on public xen.h and Mini-OS's scaling algorithm.
+//! Xen versioned PV clock. Based on public xen.h and Mini-OS's scaling
+//! algorithm.
 use core::{
     ptr::{addr_of, read_volatile},
-    sync::atomic::{AtomicU64, Ordering, fence},
+    sync::atomic::{fence, AtomicU64, Ordering},
 };
+
 use xen_sys::{
     bindings::{shared_info, vcpu_time_info},
     error::XenError,

@@ -1,6 +1,7 @@
 //! Single-producer/single-consumer Xen byte rings (console and XenStore).
 //! Shared indices are wrapping u32 counters, never offsets modulo capacity.
 use core::sync::atomic::{AtomicU32, Ordering};
+
 use volatile::VolatilePtr;
 
 #[derive(Clone, Copy, Debug)]
@@ -96,8 +97,9 @@ impl XenRing<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core::ptr::NonNull;
+
+    use super::*;
     #[test]
     fn full_ring_and_u32_wrap() {
         let mut bytes = [0u8; 8];

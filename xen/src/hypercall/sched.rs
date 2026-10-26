@@ -10,12 +10,14 @@
 
 #![allow(non_camel_case_types, clippy::missing_safety_doc)]
 
-use xen_sys::bindings::{
-    __HYPERVISOR_console_io, __HYPERVISOR_sched_op, CONSOLEIO_read, CONSOLEIO_write,
-    SCHEDOP_shutdown, SCHEDOP_yield,
+use xen_sys::{
+    bindings::{
+        __HYPERVISOR_console_io, __HYPERVISOR_sched_op, CONSOLEIO_read, CONSOLEIO_write,
+        SCHEDOP_shutdown, SCHEDOP_yield,
+    },
+    error::XenError,
+    XenConstBuffer, XenHypercall, XenMutBuffer,
 };
-
-use xen_sys::{error::XenError, XenConstBuffer, XenHypercall, XenMutBuffer};
 
 /// SCHEDOP_ defines from public/sched.h
 #[derive(Debug)]

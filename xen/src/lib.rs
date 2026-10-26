@@ -24,7 +24,7 @@ pub mod io;
 
 // export functionality
 pub mod event;
-pub mod hypercall;
 pub mod grant;
+pub mod hypercall;
 #[cfg(target_arch = "x86_64")]
 pub mod time;
