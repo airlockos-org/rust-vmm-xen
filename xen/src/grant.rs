@@ -8,6 +8,10 @@ use core::{
 
 use xen_sys::{bindings::*, error::XenError, DomId, XenHypercall};
 
+/// A view of a permanently pinned v1 grant frame. Copies share the same
+/// mapping; the caller still owns each grant reference and its backing-page
+/// lifetime.
+#[derive(Clone, Copy)]
 pub struct GrantTable {
     entries: *mut grant_entry_v1,
 }
