@@ -6,6 +6,8 @@ use crate::io::ring::XenRing;
 
 pub mod ring;
 
+pub mod block;
+
 #[repr(C)]
 #[derive(VolatileFieldAccess)]
 pub struct XenConsInterface {
