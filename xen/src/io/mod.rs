@@ -8,6 +8,8 @@ pub mod ring;
 
 pub mod block;
 
+pub mod store;
+
 #[repr(C)]
 #[derive(VolatileFieldAccess)]
 pub struct XenConsInterface {
