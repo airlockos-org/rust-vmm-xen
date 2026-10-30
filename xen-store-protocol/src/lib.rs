@@ -73,7 +73,6 @@ pub trait WatchSink {
     fn event(&mut self, path: &[u8], token: &[u8]) -> bool;
 }
 
-
 /// Maximum payload defined by Xen, independently of the 1024-byte shared ring.
 pub const MAX_PAYLOAD: usize = 4096;
 
@@ -177,15 +176,12 @@ pub struct Client {
     next: Option<u32>,
 }
 
-
-
 impl Default for Client {
     /// Start with a fresh request-identity permission.
     fn default() -> Self { Self::new() }
 }
 
 impl Client {
-    /// Create the sole client for a freshly provisioned connection.
     /// Whether another request can be admitted.
     pub closed spec fn ready(&self) -> bool { self.next is Some && self.next->Some_0 > 0 }
 
