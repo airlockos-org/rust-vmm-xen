@@ -188,3 +188,65 @@ fn explicit_lifecycle_and_wrong_direction_completion() {
     assert!(receive.awaiting());
     assert!(receive.reclaim(true).is_none());
 }
+
+/// Backend decoding honors native padding, exact completion identities, and
+/// rejects fragments/offload requests before any grant-copy effect is issued.
+#[test]
+fn backend_descriptor_snapshot_and_native_completion() {
+    use xen_net_protocol::{backend, queue::Back};
+    let mut peer = [0x11, 0x22, 0x33, 0x44, 2, 0, 0, 0, 0x55, 0x66, 0xfe, 15];
+    let packet = backend::transmit(&peer).unwrap_or_else(|_| panic!("bounded TX"));
+    peer.fill(0xff);
+    assert_eq!(packet.grant(), 0x44332211);
+    assert_eq!(packet.offset(), 2);
+    assert_eq!(packet.len(), 4094);
+    assert_eq!(packet.response(true), [0x55, 0x66, 0, 0]);
+    assert!(backend::transmit(&peer).is_err());
+    assert!(backend::transmit(&[1, 0, 0, 0, 0, 0, 4, 0, 1, 0, 64, 0]).is_err());
+    let buffer = backend::receive_buffer(&[0x55, 0x66, 0xff, 0xff, 0x11, 0x22, 0x33, 0x44]);
+    assert_eq!(buffer.grant(), 0x44332211);
+    assert_eq!(
+        buffer.response(4096, true).unwrap(),
+        [0x55, 0x66, 0, 0, 0, 0, 0, 16]
+    );
+    assert!(
+        backend::receive_buffer(&[0; 8])
+            .response(4097, true)
+            .is_err()
+    );
+    let mut backend = Back::tx();
+    for index in 0..600 {
+        let plan = backend.request(index, index + 1).unwrap().unwrap();
+        assert_eq!(plan.current(), index);
+        assert!(plan.byte(11).unwrap() < 4096);
+        assert!(backend.responded(plan));
+    }
+    assert!(backend.request(599, 600).is_err());
+    assert!(backend.request(600, 857).is_err());
+    assert!(backend.request(600, 600).unwrap().is_none());
+}
+
+/// Peer state chooses one useful bounded control step; backward, malformed and
+/// unsupported reconfiguration states cannot silently reconnect an active
+/// owner.
+#[test]
+fn backend_control_and_decimal_claims() {
+    use xen_net_protocol::{
+        backend::number_claim,
+        bus::{BackendAction, backend_action},
+    };
+    assert_eq!(number_claim(b"0"), Some(0));
+    assert_eq!(number_claim(b"4294967295"), Some(u32::MAX));
+    assert_eq!(number_claim(b"4294967296"), None);
+    assert_eq!(number_claim(b"01"), None);
+    assert_eq!(number_claim(b"-1"), None);
+    assert_eq!(backend_action(b"1", false), BackendAction::Await);
+    assert_eq!(backend_action(b"3", false), BackendAction::Await);
+    assert_eq!(backend_action(b"4", false), BackendAction::Connect);
+    assert_eq!(backend_action(b"4", true), BackendAction::Run);
+    assert_eq!(backend_action(b"5", true), BackendAction::Close);
+    assert_eq!(backend_action(b"6", false), BackendAction::Close);
+    assert_eq!(backend_action(b"1", true), BackendAction::Reject);
+    assert_eq!(backend_action(b"7", false), BackendAction::Reject);
+    assert_eq!(backend_action(b"4\0", false), BackendAction::Reject);
+}

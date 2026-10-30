@@ -36,10 +36,29 @@ OCaml implementation is an interoperability reference, not a directly linkable
 Hermit Rust driver. Its repository license is ISC; Mini-OS's COPYING gives its
 BSD-style default and lists separately GPL-covered features. Retain each file's
 provenance/license if any implementation is translated; none of those driver
-bodies is copied by the XenStore changes.
+bodies is copied by the XenStore/netif changes. The netback packet-data adapter
+uses the public grant-copy ABI (`grant_table.h`, Xen 4.20.4), with no translated
+Linux implementation bodies.
 
 Reuse this fork's grants/events/ring facilities and Hermit's existing scheduler
 and mapping ownership. Device negotiation uses the one domain XenStore stream
 and verified protocol crate; opening another stream per device would consume
 other drivers' replies. Network packet layout, feature negotiation and ownership
 need their own contracts against the public ABI before integration.
+
+
+Shared guest ownership and wrapping counters execute `xen-guest-core`. Runtime
+origins use stable, single-use Rust objects and atomic claims; that narrow identity
+boundary and mapping/grant/event correspondence remain trusted. IPC retains its
+message ABI and service loop. Clipboard's separate application admission and
+heap-credit ledgers do not represent kernel page/mapping ownership and are not
+replaced by this helper. Native netif supports one queue/combined channel,
+single-page packets up to 4096 bytes (ordinary Linux MTU 1500), and no SG/GSO or
+checksum completion. Unsupported peer flags/state/indices fail closed.
+
+A network lease is valid only within the controller-selected Xen domain lifetime.
+The existing trusted Xen lifecycle owner must retire it before permitting domain
+ID recreation/reuse; an integer domid alone is not an incarnation. The lab uses
+upstream libxl to request the same ID for a fresh guest after confirmed retirement
+and checks stale-handle rejection. This does not replace Qubes/qubesd policy or
+supply a new production lifecycle authority.

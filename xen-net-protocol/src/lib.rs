@@ -14,6 +14,7 @@
 
 use vstd::prelude::*;
 
+pub mod backend;
 pub mod bus;
 pub mod identity;
 pub mod loans;

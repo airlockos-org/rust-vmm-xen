@@ -145,5 +145,14 @@ dependencies = [
 name = "xen-store-protocol"
 version = "0.1.0"
 dependencies = [
+ "xen-guest-core",
+ "vstd",
+]
+
+
+[[package]]
+name = "xen-guest-core"
+version = "0.1.0"
+dependencies = [
  "vstd",
 ]

@@ -20,6 +20,9 @@ mod aarch64;
 #[cfg(target_arch = "aarch64")]
 pub use self::aarch64::*;
 
+/// Verified bounded ownership and retirement shared by guest services.
+pub mod resources;
+
 pub mod io;
 
 // export functionality

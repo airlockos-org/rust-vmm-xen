@@ -185,4 +185,41 @@ impl State {
     }
 }
 
+/// One bounded backend control step for an already authorized interface owner.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BackendAction {
+    /// Frontend has not yet published complete transport parameters.
+    Await,
+    /// Read/validate parameters and connect once; partial failure is terminal.
+    Connect,
+    /// Existing transport may keep processing bounded packet work.
+    Run,
+    /// Stop data processing and explicitly retire the interface.
+    Close,
+    /// Unsupported/malformed/backward state cannot initiate new effects.
+    Reject,
+}
+
+/// Functional protocol decision; each call observes only one exact node value.
+/// No waiting loop or automatic restart permits one peer to monopolize others.
+pub fn backend_action(bytes: &[u8], connected: bool) -> (action: BackendAction)
+    ensures match action {
+        BackendAction::Await => !connected && (State::Initialising.matches_spec(bytes@) || State::Initialised.matches_spec(bytes@)),
+        BackendAction::Connect => !connected && State::Connected.matches_spec(bytes@),
+        BackendAction::Run => connected && State::Connected.matches_spec(bytes@),
+        BackendAction::Close => State::Closing.matches_spec(bytes@) || State::Closed.matches_spec(bytes@),
+        BackendAction::Reject => !(State::Closing.matches_spec(bytes@) || State::Closed.matches_spec(bytes@)
+            || State::Connected.matches_spec(bytes@)
+            || (!connected && (State::Initialising.matches_spec(bytes@) || State::Initialised.matches_spec(bytes@)))),
+    },
+{
+    if State::Connected.matches(bytes) {
+        if connected { BackendAction::Run } else { BackendAction::Connect }
+    } else if State::Closing.matches(bytes) || State::Closed.matches(bytes) {
+        BackendAction::Close
+    } else if !connected && (State::Initialising.matches(bytes) || State::Initialised.matches(bytes)) {
+        BackendAction::Await
+    } else { BackendAction::Reject }
+}
+
 }

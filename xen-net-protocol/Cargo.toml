@@ -10,6 +10,7 @@ description = "Verified Xen netif framing and page-loan transitions"
 [workspace]
 
 [dependencies]
+xen-guest-core = { path = "../xen-guest-core" }
 xen-store-protocol = { path = "../xen-store-protocol" }
 vstd = { version = "=0.0.0-2026-10-18-0147", default-features = false, features = ["alloc"] }
 

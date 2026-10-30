@@ -46,3 +46,13 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+## Xen public netif/grant-copy ABI
+
+Copyright (c) 2003–2004, Keir Fraser (netif interface).
+Copyright (c) 2004, K A Fraser (grant-table interface).
+
+These public Xen 4.20.4 interfaces use the MIT permission notice reproduced
+above. New Rust codecs/adapters follow the public ABI; no Linux network driver
+implementation is copied.

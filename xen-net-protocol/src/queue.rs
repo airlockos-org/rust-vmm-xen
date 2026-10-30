@@ -8,8 +8,8 @@
 
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
-use xen_store_protocol::ring::distance;
-use xen_store_protocol::ring::{distance_value, next_index};
+use xen_guest_core::counters::distance;
+use xen_guest_core::counters::{distance_value, next_index};
 
 #[cfg(verus_keep_ghost)]
 use crate::PAGE;
@@ -199,6 +199,77 @@ impl Front {
     pub fn event(&self) -> (event: u32)
         ensures event as int == (self.consumed() as int + 1) % 0x1_0000_0000int,
     { next_index(self.consumer, 1) }
+}
+
+/// Backend counters for one ring. Each call consumes at most one request and
+/// publishes its matching response before the next request can be consumed.
+/// Packet copy completion and ring mapping ownership remain adapter obligations.
+pub struct Back {
+    /// Request consumer and response producer advance together, privately.
+    index: u32,
+    /// Native TX/RX slot stride selected at construction.
+    width: usize,
+}
+
+impl Back {
+    /// Descriptor stride is independent of all peer observations.
+    pub closed spec fn valid(&self) -> bool { self.width == 8 || self.width == 12 }
+
+    /// Private response producer and request consumer.
+    pub closed spec fn index(&self) -> u32 { self.index }
+
+    /// Native descriptor stride, fixed at construction.
+    pub closed spec fn stride(&self) -> usize { self.width }
+
+    /// Attach an empty fresh frontend TX ring; the runtime checks the initial
+    /// shared response producer using request() before any descriptor access.
+    pub fn tx() -> (queue: Self)
+        ensures queue.valid(), queue.index() == 0, queue.stride() == 12,
+    { Self { index: 0, width: 12 } }
+
+    /// Attach an empty fresh frontend RX ring.
+    pub fn rx() -> (queue: Self)
+        ensures queue.valid(), queue.index() == 0, queue.stride() == 8,
+    { Self { index: 0, width: 8 } }
+
+    /// Plan one request, rejecting response-index tampering and producer overrun.
+    /// A request producer carries availability, never an unchecked byte offset.
+    pub fn request(&self, shared_response: u32, request_producer: u32) -> (slot: Result<Option<Slot>, Invalid>)
+        requires self.valid(),
+        ensures match slot {
+            Ok(Some(value)) => value.valid() && value.index() == self.index() && value.stride() == self.stride()
+                && shared_response == self.index() && 0 < distance(request_producer, self.index()) <= SLOTS
+                && value.begin() == HEADER + (self.index() as int % SLOTS as int) * self.stride(),
+            Ok(None) => shared_response == self.index() && request_producer == self.index(),
+            Err(_) => shared_response != self.index() || distance(request_producer, self.index()) > SLOTS,
+        },
+    {
+        if shared_response != self.index { return Err(Invalid::Counter); }
+        let ready = distance_value(request_producer, self.index);
+        if ready > SLOTS as u64 { return Err(Invalid::Counter); }
+        if ready == 0 { return Ok(None); }
+        let offset = HEADER + (self.index as usize % SLOTS as usize) * self.width;
+        Ok(Some(Slot { start: self.index, offset, width: self.width }))
+    }
+
+    /// Record the matching response after its bytes are copied to the shared
+    /// slot. The returned flag cannot itself prove that the copy occurred.
+    pub fn responded(&mut self, slot: Slot) -> (accepted: bool)
+        requires old(self).valid(), slot.valid(),
+        ensures final(self).valid(), final(self).stride() == old(self).stride(),
+            accepted == (slot.index() == old(self).index() && slot.stride() == old(self).stride()),
+            accepted ==> final(self).index() as int == (old(self).index() as int + 1) % 0x1_0000_0000int,
+            !accepted ==> final(self).index() == old(self).index(),
+    {
+        if slot.start != self.index || slot.width != self.width { return false; }
+        self.index = next_index(self.index, 1);
+        true
+    }
+
+    /// Next request event threshold, before a full barrier and producer recheck.
+    pub fn event(&self) -> (event: u32)
+        ensures event as int == (self.index() as int + 1) % 0x1_0000_0000int,
+    { next_index(self.index, 1) }
 }
 
 }

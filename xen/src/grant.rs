@@ -152,3 +152,103 @@ impl ForeignMapping {
 }
 // Deliberately no automatic page reclamation: failed unmap must retain backing
 // address space. Platform ownership objects decide whether to quarantine it.
+
+/// Copy one bounded peer grant range into the start of an exclusively owned
+/// local page. Xen's grant-copy ABI is synchronous: after it returns, no
+/// foreign mapping of the destination is retained. This avoids mapping a peer
+/// data page across packet processing or allowing a stalled peer to retain a
+/// local buffer.
+///
+/// # Safety
+/// `local_pfn` identifies a pinned, exclusively owned identity-mapped guest
+/// page; the caller must not concurrently access it during the hypercall. The
+/// foreign domain must be authorized for this exact interface lifetime. `offset
+/// + length` is at most 4096, and length is positive. The caller supplies
+/// checked private descriptor fields and discards all destination bytes if the
+/// copy fails.
+///
+/// This is a narrow trusted effect boundary: the hypervisor validates the grant
+/// and performs the copy; neither this adapter nor descriptor proofs establish
+/// Xen's implementation, memory coherence or physical page ownership.
+pub unsafe fn copy_from_grant<H: XenHypercall>(
+    hyp: &H,
+    peer: DomId,
+    grant: u32,
+    offset: u16,
+    length: u16,
+    local_pfn: u64,
+) -> Result<(), XenError> {
+    let operation = gnttab_copy {
+        source: gnttab_copy_gnttab_copy_ptr {
+            u: gnttab_copy_gnttab_copy_ptr__bindgen_ty_1 { ref_: grant },
+            domid: peer.0,
+            offset,
+        },
+        dest: gnttab_copy_gnttab_copy_ptr {
+            u: gnttab_copy_gnttab_copy_ptr__bindgen_ty_1 { gmfn: local_pfn },
+            domid: DomId::SELF.0,
+            offset: 0,
+        },
+        len: length,
+        flags: GNTCOPY_source_gref as u16,
+        status: 0,
+    };
+    unsafe { copy_grant(hyp, operation) }
+}
+
+/// Copy the start of one exclusively owned local page into a peer's receive
+/// grant, without establishing any foreign mapping or retained data-page loan.
+///
+/// # Safety
+/// `local_pfn` is a pinned readable identity-mapped guest page, exclusively
+/// owned throughout this synchronous hypercall. The peer is authorized for this
+/// exact interface lifetime, and `length` is in 1..=4096. Caller bytes must be
+/// complete before this call. A successful return establishes only that Xen
+/// completed this copy, not that the frontend accepted or delivered the packet.
+///
+/// The same Xen/physical-page/coherence trust boundary as copy_from_grant
+/// applies.
+pub unsafe fn copy_to_grant<H: XenHypercall>(
+    hyp: &H,
+    peer: DomId,
+    grant: u32,
+    length: u16,
+    local_pfn: u64,
+) -> Result<(), XenError> {
+    let operation = gnttab_copy {
+        source: gnttab_copy_gnttab_copy_ptr {
+            u: gnttab_copy_gnttab_copy_ptr__bindgen_ty_1 { gmfn: local_pfn },
+            domid: DomId::SELF.0,
+            offset: 0,
+        },
+        dest: gnttab_copy_gnttab_copy_ptr {
+            u: gnttab_copy_gnttab_copy_ptr__bindgen_ty_1 { ref_: grant },
+            domid: peer.0,
+            offset: 0,
+        },
+        len: length,
+        flags: GNTCOPY_dest_gref as u16,
+        status: 0,
+    };
+    unsafe { copy_grant(hyp, operation) }
+}
+
+/// Execute exactly one synchronous grant-copy operation and preserve both
+/// hypercall-level and per-operation failure. No retry or batching occurs here.
+///
+/// # Safety
+/// Both native endpoints and their page lifetimes satisfy the public wrapper's
+/// contract. Xen may write only the fixed-size native operation during the
+/// call.
+unsafe fn copy_grant<H: XenHypercall>(hyp: &H, mut operation: gnttab_copy) -> Result<(), XenError> {
+    unsafe {
+        hyp.hypercall3(
+            __HYPERVISOR_grant_table_op as _,
+            [GNTTABOP_copy as _, (&raw mut operation).addr(), 1],
+        )?;
+    }
+    if operation.status != 0 {
+        return Err(XenError::Xen(operation.status as isize));
+    }
+    Ok(())
+}
