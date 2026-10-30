@@ -84,7 +84,7 @@ impl Gate {
     /// Observe readiness without changing the sole initialization permission.
     pub fn usable(&self) -> (ready: bool)
         ensures ready == self.ready(),
-    { match self.phase { Phase::Ready => true, _ => false } }
+    { matches!(self.phase, Phase::Ready) }
 
     /// Quarantine the connection after ambiguous stream/caller failure.
     pub fn poison(&mut self)

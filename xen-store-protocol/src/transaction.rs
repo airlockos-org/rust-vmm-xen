@@ -22,14 +22,20 @@ pub open spec fn digits(bytes: Seq<u8>) -> bool {
     forall|i: int| 0 <= i < bytes.len() ==> 48 <= #[trigger] bytes[i] <= 57
 }
 
+/// Canonical positive u32 digits, without a delimiter.
+pub open spec fn valid_token(bytes: Seq<u8>) -> bool {
+    &&& 1 <= bytes.len() <= 10
+    &&& 49 <= bytes[0] <= 57
+    &&& digits(bytes)
+    &&& 0 < number(bytes) <= u32::MAX
+}
+
 /// Canonical positive u32 followed by exactly one terminal NUL, as emitted by
 /// XenStore's transaction-start response. No whitespace/sign/leading zero.
 pub open spec fn valid(bytes: Seq<u8>) -> bool {
     &&& 2 <= bytes.len() <= 11
     &&& bytes.last() == 0
-    &&& 49 <= bytes[0] <= 57
-    &&& digits(bytes.drop_last())
-    &&& 0 < number(bytes.drop_last()) <= u32::MAX
+    &&& valid_token(bytes.drop_last())
 }
 
 /// Appending nonnegative decimal digits cannot lower the represented value.
@@ -67,30 +73,48 @@ impl Id {
         },
     {
         if bytes.len() < 2 || bytes.len() > 11 { return None; }
-        if bytes[bytes.len()-1] != 0 || bytes[0] < b'1' || bytes[0] > b'9' { return None; }
+        if bytes[bytes.len()-1] != 0 { return None; }
+        let value = Self::parse_token(vstd::slice::slice_subrange(bytes, 0, bytes.len()-1));
+        assert(bytes@.subrange(0, bytes@.len()-1) =~= bytes@.drop_last());
+        value
+    }
+
+    /// Decode an opaque decimal watch token without allocating or treating the
+    /// parsed claim as ownership/authorization for a subscription.
+    pub fn parse_token(bytes: &[u8]) -> (id: Option<Self>)
+        ensures match id {
+            Some(value) => valid_token(bytes@) && value.identity() == number(bytes@),
+            None => !valid_token(bytes@),
+        },
+    {
+        if bytes.is_empty() || bytes.len() > 10 { return None; }
+        if !(b'1'..=b'9').contains(&bytes[0]) { return None; }
         let mut i = 0;
         let mut value: u32 = 0;
-        while i < bytes.len()-1
-            invariant i <= bytes.len()-1, 2 <= bytes@.len() <= 11,
-                bytes@[bytes@.len()-1] == 0, 49 <= bytes@[0] <= 57,
+        while i < bytes.len()
+            invariant i <= bytes.len(), 1 <= bytes@.len() <= 10, 49 <= bytes@[0] <= 57,
                 digits(bytes@.subrange(0, i as int)),
                 value == number(bytes@.subrange(0, i as int)),
-            decreases bytes.len()-1-i,
+            decreases bytes.len()-i,
         {
             let byte = bytes[i];
-            if byte < b'0' || byte > b'9' {
-                assert(bytes@.drop_last()[i as int] == byte);
-                assert(!digits(bytes@.drop_last()));
-                return None;
-            }
-            let next = value as u64 * 10 + (byte - b'0') as u64;
+            // Checked radix decoding keeps the executable predicate inside
+            // the proof boundary; vstd does not specify u8::is_ascii_digit.
+            let digit = match byte.checked_sub(b'0') {
+                Some(digit) if digit <= 9 => digit,
+                _ => {
+                    assert(bytes@[i as int] == byte);
+                    assert(!digits(bytes@));
+                    return None;
+                },
+            };
+            let next = value as u64 * 10 + digit as u64;
             assert(bytes@.subrange(0, i as int + 1).drop_last() =~= bytes@.subrange(0, i as int));
             assert(next == number(bytes@.subrange(0, i as int + 1)));
             if next > u32::MAX as u64 {
                 proof {
-                    if valid(bytes@) {
-                        prefix_bound(bytes@.drop_last(), i as int + 1);
-                        assert(bytes@.drop_last().subrange(0, i as int + 1) =~= bytes@.subrange(0, i as int + 1));
+                    if valid_token(bytes@) {
+                        prefix_bound(bytes@, i as int + 1);
                         assert(false);
                     }
                 }
@@ -99,8 +123,8 @@ impl Id {
             value = next as u32;
             i += 1;
         }
-        assert(bytes@.subrange(0, i as int) =~= bytes@.drop_last());
-        proof { prefix_bound(bytes@.drop_last(), 1); }
+        assert(bytes@.subrange(0, i as int) =~= bytes@);
+        proof { prefix_bound(bytes@, 1); }
         Some(Self { value })
     }
 

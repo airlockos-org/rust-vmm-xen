@@ -113,7 +113,7 @@ fn transaction_id_boundaries_and_explicit_end() {
         b"+1\0",
         b"1",
         b"4294967296\0",
-        b"1\000\0",
+        b"1\x0000\0",
         b"-1\0",
         b"1x\0",
     ] {
@@ -122,4 +122,44 @@ fn transaction_id_boundaries_and_explicit_end() {
     assert!(transaction::acknowledged(b"OK\0"));
     assert!(!transaction::acknowledged(b"OK"));
     assert!(!transaction::acknowledged(b"OK\0extra"));
+}
+
+/// Notifications coalesce by retained label; late events cannot reach a
+/// replacement, and forgotten keys remain charged against the admission limit.
+#[test]
+fn watch_lifetime_isolation_and_quarantined_capacity() {
+    let mut inbox = watches::Inbox::new();
+    let first = inbox.reserve().unwrap();
+    let second = inbox.reserve().unwrap();
+    let body = watches::Request::new(b"device/vif/0/state", b"1", &first).unwrap();
+    assert_eq!(body.read_body(), b"device/vif/0/state\0");
+    assert_eq!(body.bytes(), b"device/vif/0/state\x001\0");
+    assert!(watches::Request::new(b"path\0injection", b"1", &first).is_none());
+    assert!(watches::Request::new(b"path", b"2", &first).is_none());
+    inbox.notify(b"1");
+    inbox.notify(b"1");
+    assert!(inbox.take(&first));
+    assert!(!inbox.take(&first));
+    assert!(!inbox.take(&second));
+    assert!(inbox.release(first));
+    let replacement = inbox.reserve().unwrap();
+    assert_ne!(replacement.wire(), 1);
+    inbox.notify(b"1");
+    inbox.notify(b"01");
+    inbox.notify(b"4294967296");
+    assert!(!inbox.take(&replacement));
+    inbox.notify(b"2");
+    assert!(inbox.take(&second));
+    // Dropping the key is not acknowledged daemon cleanup and frees no credit.
+    {
+        let _abandoned = second;
+    }
+    let mut retained = alloc::vec::Vec::new();
+    while let Some(key) = inbox.reserve() {
+        retained.push(key);
+    }
+    assert_eq!(retained.len(), watches::LIMIT - 2);
+    assert!(inbox.reserve().is_none());
+    assert!(inbox.release(replacement));
+    assert!(inbox.reserve().is_some());
 }

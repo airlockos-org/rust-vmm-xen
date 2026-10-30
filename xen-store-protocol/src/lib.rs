@@ -54,6 +54,7 @@ use alloc::vec::Vec;
 pub mod domain;
 pub mod ring;
 pub mod transaction;
+pub mod watches;
 
 use vstd::{
     bytes::{u32_from_le_bytes, u32_to_le_bytes},
