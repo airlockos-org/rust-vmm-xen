@@ -164,6 +164,11 @@ pub struct Client {
 
 
 
+impl Default for Client {
+    /// Start with a fresh request-identity permission.
+    fn default() -> Self { Self::new() }
+}
+
 impl Client {
     /// Create the sole client for a freshly provisioned connection.
     /// Whether another request can be admitted.
