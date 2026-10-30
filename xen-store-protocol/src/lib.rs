@@ -51,7 +51,9 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+pub mod domain;
 pub mod ring;
+pub mod transaction;
 
 use vstd::{
     bytes::{u32_from_le_bytes, u32_to_le_bytes},
@@ -184,6 +186,18 @@ impl Default for Client {
 impl Client {
     /// Whether another request can be admitted.
     pub closed spec fn ready(&self) -> bool { self.next is Some && self.next->Some_0 > 0 }
+
+    /// Quarantine a syntactically valid stream after higher-level semantic
+    /// uncertainty. Caller-directed abort failure must never reset request IDs.
+    pub fn poison(&mut self)
+        ensures !final(self).ready(), final(self).next_id() == 0,
+    { self.next = None; }
+
+    /// Observe whether the stream remains usable after an exchange. Runtime
+    /// dispatchers use this result directly when propagating connection failure.
+    pub fn usable(&self) -> (ready: bool)
+        ensures ready == self.ready(),
+    { match self.next { Some(id) => id > 0, None => false } }
 
     /// Identity reserved for the next admitted request.
     pub closed spec fn next_id(&self) -> u32 { match self.next { Some(id) => id, None => 0 } }

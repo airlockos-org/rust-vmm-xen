@@ -11,7 +11,8 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 pub use xen_store_protocol::{
-    ring, text_length, Error, Operation, Transport, Watch, MAX_PAYLOAD, MAX_WATCHES,
+    domain, ring, text_length, transaction, Error, Operation, Transport, Watch, MAX_PAYLOAD,
+    MAX_WATCHES,
 };
 
 /// Connection state whose protocol decisions execute the verified
@@ -34,6 +35,16 @@ impl Client {
         Self {
             inner: xen_store_protocol::Client::new(),
         }
+    }
+
+    /// Preserve semantic uncertainty by refusing subsequent stream operations.
+    pub fn poison(&mut self) {
+        self.inner.poison();
+    }
+
+    /// Observe the core's connection state without reconstructing its rules.
+    pub fn usable(&self) -> bool {
+        self.inner.usable()
     }
 
     /// Exchange one request through the verified core. See `Transport` for the

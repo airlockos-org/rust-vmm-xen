@@ -73,3 +73,53 @@ fn ring_rollover_and_local_counter_tampering() {
     assert!(ring::send(1024, 1024, 0, 1).unwrap().is_empty());
     assert!(ring::receive(1, 1, 1, 1).unwrap().is_empty());
 }
+
+/// Failed or interrupted initialization cannot be retried, while an established
+/// connection can be observed repeatedly without consuming another permission.
+#[test]
+fn domain_initialization_is_monotonic() {
+    let mut interrupted = domain::Gate::new();
+    assert!(interrupted.begin());
+    assert!(!interrupted.usable());
+    assert!(!interrupted.begin());
+    assert!(!interrupted.finish(false));
+    assert!(!interrupted.begin());
+    assert!(!interrupted.finish(true));
+
+    let mut ready = domain::Gate::new();
+    assert!(ready.begin());
+    assert!(ready.finish(true));
+    assert!(ready.usable());
+    assert!(!ready.begin());
+    assert!(ready.usable());
+    ready.poison();
+    assert!(!ready.usable());
+    assert!(!ready.begin());
+    assert!(!ready.finish(true));
+}
+
+/// Transaction IDs preserve the full u32 range and reject ambiguous grammar.
+#[test]
+fn transaction_id_boundaries_and_explicit_end() {
+    let id = transaction::Id::parse(b"4294967295\0").unwrap();
+    assert_eq!(id.wire(), u32::MAX);
+    assert_eq!(id.finish(false), (u32::MAX, [b'F', 0]));
+    let id = transaction::Id::parse(b"1\0").unwrap();
+    assert_eq!(id.finish(true), (1, [b'T', 0]));
+    for invalid in [
+        b"".as_slice(),
+        b"0\0",
+        b"01\0",
+        b"+1\0",
+        b"1",
+        b"4294967296\0",
+        b"1\000\0",
+        b"-1\0",
+        b"1x\0",
+    ] {
+        assert!(transaction::Id::parse(invalid).is_none());
+    }
+    assert!(transaction::acknowledged(b"OK\0"));
+    assert!(!transaction::acknowledged(b"OK"));
+    assert!(!transaction::acknowledged(b"OK\0extra"));
+}
