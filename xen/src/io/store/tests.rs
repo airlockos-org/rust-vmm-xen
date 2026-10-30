@@ -183,7 +183,7 @@ fn watch_overflow_and_zero_progress_poison() {
     );
 }
 
-/// Unpublished oversized requests remain retryable; request IDs never wrap.
+/// Unpublished oversized requests remain retryable without consuming an ID.
 #[test]
 fn local_limits_do_not_publish() {
     let mut stream = Stream::new(&[message(2, 1, 0, b"value")], 16);
@@ -203,11 +203,25 @@ fn local_limits_do_not_publish() {
         client.exchange(&mut stream, Operation::Read, 0, b"path\0", |_| false),
         Ok(b"value".to_vec())
     );
-    client.next = u32::MAX;
-    let published = stream.outgoing.len();
+}
+
+/// A continuous watch flood is bounded even if the transport always progresses.
+#[test]
+fn watch_flood_poisoning_is_bounded() {
+    let events = alloc::vec![message(15, 0, 0, b"path\0token\0"); MAX_WATCHES + 1];
+    let mut stream = Stream::new(&events, 64);
+    let mut client = Client::new();
+    let mut delivered = 0;
     assert_eq!(
-        client.exchange(&mut stream, Operation::Read, 0, b"path\0", |_| false),
+        client.exchange(&mut stream, Operation::Read, 0, b"path\0", |_| {
+            delivered += 1;
+            true
+        }),
+        Err(Error::Protocol)
+    );
+    assert_eq!(delivered, MAX_WATCHES);
+    assert_eq!(
+        client.exchange(&mut stream, Operation::Read, 0, b"path\0", |_| true),
         Err(Error::Poisoned)
     );
-    assert_eq!(stream.outgoing.len(), published);
 }

@@ -11,6 +11,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+xen-store-protocol = { path = "../xen-store-protocol" }
 volatile = { version = "0.6.1", features = ["derive", "unstable"] }
 xen-sys = { path = "../xen-sys" }
 
