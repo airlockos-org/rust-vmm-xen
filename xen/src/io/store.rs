@@ -137,12 +137,11 @@ impl Client {
         // partially consumed message. Only a complete daemon reply clears this.
         self.poisoned = true;
         let mut header = [0; 16];
-        for (part, value) in
-            header
-                .chunks_exact_mut(4)
-                .zip([operation as u32, id, transaction, body.len() as u32])
+        for (index, value) in [operation as u32, id, transaction, body.len() as u32]
+            .iter()
+            .enumerate()
         {
-            part.copy_from_slice(&value.to_le_bytes());
+            header[index * 4..index * 4 + 4].copy_from_slice(&value.to_le_bytes());
         }
         write_all(transport, &header)?;
         write_all(transport, body)?;
