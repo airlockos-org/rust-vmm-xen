@@ -10,7 +10,9 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-pub use xen_store_protocol::{ring, Error, Operation, Transport, Watch, MAX_PAYLOAD, MAX_WATCHES};
+pub use xen_store_protocol::{
+    ring, text_length, Error, Operation, Transport, Watch, MAX_PAYLOAD, MAX_WATCHES,
+};
 
 /// Connection state whose protocol decisions execute the verified
 /// implementation.
