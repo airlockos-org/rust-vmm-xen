@@ -32,6 +32,21 @@
 //! recoverable protocol success. Proofs bound logical lengths/work, not
 //! allocator metadata, physical memory mapping, hypervisor behavior or
 //! scheduler wall-clock progress.
+//!
+//! # Persistence and interruption
+//!
+//! Connection state is volatile and belongs to one fresh domain lifetime. No
+//! recovery journal is written and a live stream is never reopened. A matching
+//! daemon reply acknowledges its operation; it promises neither survival across
+//! a host crash nor block-device durability. Storage durability and multi-key
+//! transaction semantics remain the daemon/device caller's contract.
+//!
+//! After an ambiguous transport failure, the request may already have taken
+//! effect. Poisoning prevents replay on this connection; it does not undo the
+//! operation. Callers must reconcile authoritative state through their recovery
+//! path before retrying uncertain work. An explicit EAGAIN reply is fully
+//! consumed and permits caller-directed transaction recovery, not automatic
+//! commit replay or a claim that previous work was durable.
 
 extern crate alloc;
 
