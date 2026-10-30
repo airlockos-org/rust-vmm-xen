@@ -10,6 +10,7 @@ members = [
 ]
 exclude = [
     "xen-store-protocol",
+    "xen-net-protocol",
     "oxerun",
     "examples/ioctls",
     "examples/xstore",

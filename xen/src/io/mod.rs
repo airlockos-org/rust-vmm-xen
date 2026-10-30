@@ -10,6 +10,8 @@ pub mod block;
 
 pub mod store;
 
+pub mod net;
+
 #[repr(C)]
 #[derive(VolatileFieldAccess)]
 pub struct XenConsInterface {

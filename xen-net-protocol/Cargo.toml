@@ -1,0 +1,20 @@
+[package]
+name = "xen-net-protocol"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Verified Xen netif framing and page-loan transitions"
+
+# Keep proof execution and its reviewed lock scoped to this protocol crate.
+[workspace]
+
+[dependencies]
+xen-store-protocol = { path = "../xen-store-protocol" }
+vstd = { version = "=0.0.0-2026-10-18-0147", default-features = false, features = ["alloc"] }
+
+[package.metadata.verus]
+verify = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(verus_keep_ghost)', 'cfg(verus_only)'] }
