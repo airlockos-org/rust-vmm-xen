@@ -151,4 +151,17 @@ pub fn acknowledged(bytes: &[u8]) -> (ack: bool)
     ack
 }
 
+/// Only an explicit commit conflict is retryable on this same connection.
+/// Abort errors or other daemon errors leave cleanup uncertain and must be
+/// quarantined by the runtime instead of inferred to be successful rollback.
+pub fn conflict(commit: bool, bytes: &[u8]) -> (retryable: bool)
+    ensures retryable == (commit && bytes@ == seq![69u8, 65u8, 71u8, 65u8, 73u8, 78u8]),
+{
+    let retryable = commit && bytes.len() == 6 && bytes[0] == b'E'
+        && bytes[1] == b'A' && bytes[2] == b'G' && bytes[3] == b'A'
+        && bytes[4] == b'I' && bytes[5] == b'N';
+    if retryable { assert(bytes@ =~= seq![69u8, 65u8, 71u8, 65u8, 73u8, 78u8]); }
+    retryable
+}
+
 }
